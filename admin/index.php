@@ -1,4 +1,4 @@
-<?php require '../config.php'; need('admin'); require __DIR__.'/../toko.php';
+<?php require '../config.php'; need('admin'); require __DIR__.'/../toko.php'; require_once __DIR__.'/../version.php';
 $t=date('Y-m-d');
 $tot=$db->query("SELECT COUNT(*) FROM users WHERE aktif=1 AND role='staff'")->fetchColumn();
 $q=$db->prepare("SELECT status,COUNT(*) c FROM absensi WHERE tanggal=? GROUP BY status");$q->execute([$t]);$c=array_column($q->fetchAll(),'c','status');
@@ -14,4 +14,5 @@ head('Dashboard');?>
 <table class="w-full text-sm"><tr class="text-left text-stone-500"><th>Nama</th><th>Toko</th><th>Masuk</th><th>Pulang</th><th>Total Jam</th><th>Foto</th></tr>
 <?php foreach($q as $r):?><tr class="border-t border-yellow-100"><td class="py-1"><?=e($r['nama'])?></td><td><?=e($r['tm']?:'-')?></td><td><?=substr($r['jam_masuk'],0,5)?></td><td><?=$r['jam_pulang']?substr($r['jam_pulang'],0,5):'-'?></td><td class="font-semibold"><?=hm(detik($r['jam_masuk'],$r['jam_pulang']))?></td>
 <td><?php foreach(['foto_masuk','foto_pulang'] as $k)if($r[$k])echo '<a class="text-yellow-700 underline mr-1" target="_blank" href="'.BASE.'/uploads/'.e($r[$k]).'">'.($k==='foto_masuk'?'masuk':'pulang').'</a>';?></td></tr><?php endforeach;?></table></div>
+<?=versi_html()?>
 <?php foot();

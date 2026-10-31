@@ -1,10 +1,13 @@
 <?php require '../config.php'; need('admin'); require __DIR__.'/_migrasi.php'; require __DIR__.'/../toko.php';
 $d1=$_GET['dari']??date('Y-m-01');$d2=$_GET['sampai']??date('Y-m-d');$uid=(int)($_GET['u']??0);
-$sql='SELECT a.*,u.nama,tm.nama tm,tp.nama tp FROM absensi a JOIN users u ON u.id=a.user_id LEFT JOIN toko tm ON tm.id=a.toko_masuk LEFT JOIN toko tp ON tp.id=a.toko_pulang WHERE a.tanggal BETWEEN ? AND ?'.($uid?' AND a.user_id=?':'').' ORDER BY a.tanggal DESC,u.nama';
+$sql='SELECT a.*,u.nama,u.gaji_per_jam,u.uang_makan,tm.nama tm,tp.nama tp FROM absensi a JOIN users u ON u.id=a.user_id LEFT JOIN toko tm ON tm.id=a.toko_masuk LEFT JOIN toko tp ON tp.id=a.toko_pulang WHERE a.tanggal BETWEEN ? AND ?'.($uid?' AND a.user_id=?':'').' ORDER BY a.tanggal DESC,u.nama';
 $q=$db->prepare($sql);$q->execute($uid?[$d1,$d2,$uid]:[$d1,$d2]);$rows=$q->fetchAll();
+$tJam=$tGaji=$tMakan=0;
+foreach($rows as &$r){$dt=detik($r['jam_masuk'],$r['jam_pulang']);$r['_gaji']=$dt===null?0:(int)round($dt/3600*$r['gaji_per_jam']);$r['_makan']=(int)$r['uang_makan'];$tJam+=$dt??0;$tGaji+=$r['_gaji'];$tMakan+=$r['_makan'];}
+unset($r);
 if(isset($_GET['csv'])){header('Content-Type: text/csv');header('Content-Disposition: attachment; filename=laporan-absensi.csv');$o=fopen('php://output','w');
- fputcsv($o,['Tanggal','Nama','Toko Masuk','Toko Pulang','Masuk','Pulang','Total Jam']);
- foreach($rows as $r)fputcsv($o,[$r['tanggal'],$r['nama'],$r['tm'],$r['tp'],$r['jam_masuk'],$r['jam_pulang'],hm(detik($r['jam_masuk'],$r['jam_pulang']))]);exit;}
+ fputcsv($o,['Tanggal','Nama','Toko Masuk','Toko Pulang','Masuk','Pulang','Total Jam','Gaji Pokok','Uang Makan']);
+ foreach($rows as $r)fputcsv($o,[$r['tanggal'],$r['nama'],$r['tm'],$r['tp'],$r['jam_masuk'],$r['jam_pulang'],hm(detik($r['jam_masuk'],$r['jam_pulang'])),$r['_gaji'],$r['_makan']]);exit;}
 $us=$db->query('SELECT id,nama FROM users ORDER BY nama')->fetchAll();
 $tokoAll=$db->query('SELECT nama,lat,lng,radius FROM toko WHERE aktif=1 AND lat IS NOT NULL AND lng IS NOT NULL ORDER BY id')->fetchAll();
 head('Laporan');?>
@@ -18,11 +21,17 @@ head('Laporan');?>
  <label class="text-sm">Pegawai<select name="u" class="<?=INP?>"><option value="0">Semua</option><?php foreach($us as $x)echo '<option value="'.$x['id'].'" '.($x['id']==$uid?'selected':'').'>'.e($x['nama']).'</option>';?></select></label>
  <button class="<?=BTN?>">Tampilkan</button>
  <button name="csv" value="1" class="rounded-lg border border-yellow-400 px-4 py-2 hover:bg-yellow-100">Unduh CSV</button></form>
-<div class="<?=CARD?> overflow-x-auto"><table class="w-full text-sm"><tr class="text-left text-stone-500"><th>Tanggal</th><th>Nama</th><th>Toko</th><th>Masuk</th><th>Pulang</th><th>Total Jam</th><th>Foto</th><th>Peta</th><th></th></tr>
+<p class="text-sm text-stone-500 mb-2">Periode <?=date('d-m-Y',strtotime($d1))?> sampai <?=date('d-m-Y',strtotime($d2))?></p>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+<?php foreach([['Total Jam Kerja',hm($tJam),count($rows).' hari absen',''],['Total Gaji Pokok',rp($tGaji),'berdasarkan jam kerja',''],['Total Uang Makan',rp($tMakan),'per hari absen',''],['Total Keseluruhan',rp($tGaji+$tMakan),'gaji pokok + uang makan','!bg-amber-100']] as [$l,$v,$sub,$bg]):?>
+ <div class="<?=CARD?> <?=$bg?> text-center"><p class="text-xl md:text-2xl font-bold text-yellow-800 break-words"><?=$v?></p><p class="text-sm font-medium"><?=$l?></p><p class="text-xs text-stone-400"><?=$sub?></p></div>
+<?php endforeach;?></div>
+<div class="<?=CARD?> overflow-x-auto"><table class="w-full text-sm"><tr class="text-left text-stone-500"><th>Tanggal</th><th>Nama</th><th>Toko</th><th>Masuk</th><th>Pulang</th><th>Total Jam</th><th>Gaji Pokok</th><th>Uang Makan</th><th>Foto</th><th>Peta</th><th></th></tr>
 <?php foreach($rows as $r):?><tr class="border-t border-yellow-100"><td class="py-1"><?=date('d-m-Y',strtotime($r['tanggal']))?></td><td><?=e($r['nama'])?></td><td><?=e($r['tm']?:'-')?><?=($r['tp']&&$r['tp']!==$r['tm'])?' → '.e($r['tp']):''?></td><td><?=substr($r['jam_masuk'],0,5)?></td><td><?=$r['jam_pulang']?substr($r['jam_pulang'],0,5):'<span class="px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-700">Belum pulang</span>'?></td><td class="font-semibold"><?=hm(detik($r['jam_masuk'],$r['jam_pulang']))?><?php if(!empty($r['dikoreksi']))echo ' <span class="px-2 py-0.5 rounded-full text-[10px] bg-amber-100 text-amber-800 font-medium">dikoreksi</span><div class="text-[11px] font-normal text-stone-400 max-w-[200px] whitespace-normal">'.e($r['catatan']).'</div>';?></td>
+<td><?=$r['_gaji']?rp($r['_gaji']):'-'?></td><td><?=$r['_makan']?rp($r['_makan']):'-'?></td>
 <td><?php foreach(['foto_masuk'=>'masuk','foto_pulang'=>'pulang'] as $k=>$l)if($r[$k])echo '<a class="text-yellow-700 underline mr-1" target="_blank" href="'.BASE.'/uploads/'.e($r[$k]).'">'.$l.'</a>';?></td>
 <td><?php if($r['lat_masuk']||$r['lat_pulang']):?><button type="button" onclick="peta(this)" class="text-yellow-700 underline" data-nama="<?=e($r['nama'])?>" data-tgl="<?=date('d-m-Y',strtotime($r['tanggal']))?>" data-mjam="<?=substr($r['jam_masuk'],0,5)?>" data-mlat="<?=e($r['lat_masuk'])?>" data-mlng="<?=e($r['lng_masuk'])?>" data-pjam="<?=substr((string)$r['jam_pulang'],0,5)?>" data-plat="<?=e($r['lat_pulang'])?>" data-plng="<?=e($r['lng_pulang'])?>" data-tm="<?=e($r['tm'])?>" data-tp="<?=e($r['tp'])?>">Lihat peta</button><?php else:?>-<?php endif;?></td><td><a class="text-yellow-700 underline" href="koreksi.php?id=<?=$r['id']?>">Koreksi</a></td></tr><?php endforeach;?>
-<?php if(!$rows)echo '<tr><td colspan="9" class="py-4 text-center text-stone-400">Tidak ada data.</td></tr>';?></table></div>
+<?php if(!$rows)echo '<tr><td colspan="11" class="py-4 text-center text-stone-400">Tidak ada data.</td></tr>';?></table></div>
 <div id="pm" class="hidden fixed inset-0 z-50 bg-black/40 p-3 grid place-items-center" onclick="if(event.target===this)this.classList.add('hidden')">
  <div class="<?=CARD?> w-full max-w-2xl !p-4">
   <div class="flex justify-between items-center mb-2"><div><b id="pj" class="block text-sm"></b><span id="pt" class="text-xs text-stone-500"></span></div><button type="button" onclick="document.getElementById('pm').classList.add('hidden')" class="text-xl px-2">✕</button></div>

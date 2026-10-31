@@ -1,0 +1,17 @@
+# Foto absensi pegawai (data pribadi), jangan di-commit
+uploads/*
+!uploads/.htaccess
+
+# Hasil backup dan unduhan
+backup-*
+rekap-jam-kerja-*
+laporan-absensi*.csv
+
+# File diagnosa sementara
+cek.php
+
+# Sistem dan editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -8,8 +8,10 @@ try{
   $ins->execute(['Toko A',$s['lat']??null,$s['lng']??null,$s['radius']??100,isset($s['lat'])?1:0]);
   $ins->execute(['Toko B',null,null,100,0]);$ins->execute(['Toko C',null,null,100,0]);}
  if(!$db->query("SHOW COLUMNS FROM absensi LIKE 'toko_masuk'")->fetch())$db->exec("ALTER TABLE absensi ADD toko_masuk INT NULL, ADD toko_pulang INT NULL");
+if(!$db->query("SHOW COLUMNS FROM users LIKE 'gaji_per_jam'")->fetch())$db->exec("ALTER TABLE users ADD gaji_per_jam INT NOT NULL DEFAULT 0, ADD uang_makan INT NOT NULL DEFAULT 0");
 }catch(PDOException $e){die('Gagal menyiapkan data toko: '.htmlspecialchars($e->getMessage()));}
 function toko_terdekat($db,$lat,$lng){$b=null;
  foreach($db->query('SELECT * FROM toko WHERE aktif=1 AND lat IS NOT NULL AND lng IS NOT NULL')->fetchAll() as $t){
   $d=jarak($lat,$lng,(float)$t['lat'],(float)$t['lng']);if(!$b||$d<$b['d'])$b=$t+['d'=>$d];}
  return $b;}
+function rp($n){return 'Rp '.number_format((float)$n,0,',','.');}
